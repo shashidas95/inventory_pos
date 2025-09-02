@@ -22,4 +22,9 @@ class Order extends Model
     {
         return $this->hasOne(Invoice::class, 'order_id');
     }
+
+    public function subtotal()
+    {
+        return $this->details->sum(fn($item) => $item->total);
+    }
 }

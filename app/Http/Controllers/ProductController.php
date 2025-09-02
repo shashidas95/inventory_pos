@@ -39,14 +39,16 @@ class ProductController extends Controller
     }
     public function store(Request $request): JsonResponse
     {
+
         $validator = Validator::make($request->all(), [
-            'category_id' => 'required',
-            'name' => 'required',
-            'description' => 'required',
-            'price' => 'required',
-            'quantity' => 'required',
+            'category_id' => 'required|exists:categories,id',
+            'name' => 'required|string|max:255',
+            'description' => 'required|string',
+            'price' => 'required|numeric',
+            'quantity' => 'required|integer',
             'image' => 'nullable|image|mimes:jpeg,png,jpg|max:1024',
         ]);
+
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
@@ -103,11 +105,10 @@ class ProductController extends Controller
             'data' => $product
         ]);
     }
-    public function update($product_id, Request $request): JsonResponse | RedirectResponse
+    public function update(Product $product, Request $request): JsonResponse
     {
-        // Validation
         $validator = Validator::make($request->all(), [
-            'category_id' => 'required',
+            'category_id' => 'required|exists:categories,id',
             'name'        => 'required|string|max:255',
             'description' => 'required|string',
             'price'       => 'required|numeric',
@@ -120,30 +121,22 @@ class ProductController extends Controller
                 'status'  => 'error',
                 'errors'  => $validator->errors(),
                 'message' => 'Validation error!',
-            ], 422); // 422 is standard for validation errors
+            ], 422);
         }
 
-
-        $path = '';
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('products', 'public');
-        }
-        $product = Product::find($product_id);
-
-        // Update fields
-        $product->category_id = $request->category_id;
-        $product->name        = $request->name;
-        $product->description = $request->description;
-        $product->price       = $request->price;
-        $product->quantity    = $request->quantity;
-
-        // Only update image if a new one is uploaded
+        // Only update image if uploaded
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('products', 'public');
             $product->image = $path;
         }
 
-        $product->save();
+        $product->update([
+            'category_id' => $request->category_id,
+            'name'        => $request->name,
+            'description' => $request->description,
+            'price'       => $request->price,
+            'quantity'    => $request->quantity,
+        ]);
 
         return response()->json([
             'status'  => 'success',
@@ -151,6 +144,8 @@ class ProductController extends Controller
             'message' => 'Product updated successfully.'
         ]);
     }
+
+
 
     public function adminProductList()
     {

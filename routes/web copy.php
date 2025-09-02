@@ -38,15 +38,7 @@ Route::prefix('backend')->group(function () {
 // -------------------- BACKEND ADMIN APIs --------------------
 Route::prefix('backend/admin')->middleware([JwtTokenVerify::class, 'role:admin'])->group(function () {
 
-    // Admin Customer routes
-    Route::prefix('customers')->group(function () {
-        Route::get('/', action: [CustomerController::class, 'index'])->name('admin.customers.index'); // blade view
-        Route::get('/create', [CustomerController::class, 'create'])->name('admin.customers.create');
-        Route::get('/list', [CustomerController::class, 'list'])->name('admin.customers.list'); // ajax list
-        Route::post('/store', [CustomerController::class, 'store'])->name('admin.customers.store'); // ajax store
-    });
-
-    // -------------------- Categories --------------------
+    // Categories
     Route::prefix('categories')->group(function () {
         Route::get('/', [CategoryController::class, 'index'])->name('categories.index');
         Route::get('/create', [CategoryController::class, 'create'])->name('categories.create');
@@ -58,52 +50,94 @@ Route::prefix('backend/admin')->middleware([JwtTokenVerify::class, 'role:admin']
     });
 
 
-    // -------------------- Products --------------------
+    // Products
     Route::prefix('products')->group(function () {
         Route::get('/list', [ProductController::class, 'adminProductList'])->name('admin.products.adminProductList');
         Route::get('/create', [ProductController::class, 'adminProductCreate'])->name('admin.products.adminProductCreate');
-        Route::get('/edit/{product}', [ProductController::class, 'adminProductEdit'])->name('admin.products.adminProductEdit');
-        Route::get('/show/{product}', [ProductController::class, 'adminProductShow'])->name('admin.products.adminProductShow');
+        Route::get('/edit/{id}', [ProductController::class, 'adminProductEdit'])->name('admin.products.adminProductEdit');
+        Route::get('/{id}', [ProductController::class, 'adminProductShow'])->name('admin.products.adminProductShow');
 
         Route::post('/store', [ProductController::class, 'store'])->name('admin.products.store');
-        Route::put('/update/{product}', [ProductController::class, 'update'])->name('admin.products.update');
-        Route::delete('/delete/{product}', [ProductController::class, 'adminProductDelete'])->name('admin.products.adminProductDelete');
+        Route::post('/update/{id}', [ProductController::class, 'update'])->name('admin.products.update');
+        Route::delete('/delete/{id}', [ProductController::class, 'adminProductDelete'])->name('admin.products.adminProductDelete');
     });
 
-    // -------------------- Orders --------------------
-    Route::prefix('orders')->group(function () {
-        Route::get('/list', [OrderController::class, 'listOrders'])->name('orders.list');
-        Route::post('/create', [OrderController::class, 'store'])->name('orders.store');   // renamed createOrder -> store
-        Route::post('/update/{id}', [OrderController::class, 'update'])->name('orders.update');
-        Route::post('/delete/{id}', [OrderController::class, 'destroy'])->name('orders.delete');
-        // Create invoice for an order
-        Route::post('/{order}/invoice', [InvoiceController::class, 'createInvoice'])
-            ->name('orders.createInvoice');
-    });
-    // -------------------- Sales --------------------
+
+    // Sales
     Route::prefix('sales')->group(function () {
-        // Page
-        Route::get('/create', [PageController::class, 'salesPage'])->name('sales.page');
+        Route::get('/create', [PageController::class, 'salesPage'])->name('sales.page'); // page for creating sale
+        Route::get('/list', [SalesController::class, 'listInvoices'])->name('sales.list'); // list page
+        Route::get('/{id}', [SalesController::class, 'show'])->name('sales.show'); // show sale details
+
+
+
+        // Actions
+        Route::post('/create', [SalesController::class, 'createInvoice'])->name('sales.create'); // create action
+        Route::post('/update/{id}', [SalesController::class, 'update'])->name('sales.update'); // update action
+        Route::post('/delete/{id}', [SalesController::class, 'destroy'])->name('sales.destroy'); // delete action
+
     });
-    // -------------------- Invoices --------------------
+
+    // Invoices
     Route::prefix('invoices')->group(function () {
-        Route::get('/list', [InvoiceController::class, 'listInvoices'])->name('invoices.list');
-        Route::get('/show/{id}', [InvoiceController::class, 'show'])->name('invoices.show');
-        Route::get('/print/{id}', [InvoiceController::class, 'printInvoice'])->name('invoices.print');
-        Route::post('/store-sale', [InvoiceController::class, 'storeSale'])->name('invoice.store.sale');
+        // Pages
+        Route::get('/list', [InvoiceController::class, 'listInvoices'])->name('invoices.list'); // list page
+        Route::get('/{id}', [InvoiceController::class, 'show'])->name('invoices.show'); // show invoice details
+        Route::get('/print/{id}', [InvoiceController::class, 'printInvoice'])->name('invoices.print'); // print invoice
+
+        Route::post('/invoice-create', [SalesController::class, 'storeSale'])->name('invoice.create');
+
+        // Actions
+        Route::post('/create-sale', [InvoiceController::class, 'storeSale'])->name('invoice.store.sale');
+        Route::post('/create', [InvoiceController::class, 'store'])->name('invoices.create');
+        Route::post('/update/{id}', [InvoiceController::class, 'update'])->name('invoices.update');
+        Route::post('/delete/{id}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
     });
+    // Route::prefix('backend/admin')->middleware(['jwtTokenVerify', 'role:admin'])->group(function () {
+
+    //     // Create Sale Page
+    //     Route::get('/sales/create', [PageController::class, 'salesPage'])->name('sales.page');
+
+    //     // Store Sale & Invoice
+    //     Route::post('/sales/create', [SalesController::class, 'createInvoice'])->name('sales.create');
+
+    //     // Print Invoice
+    //     Route::get('/invoices/print/{id}', [InvoiceController::class, 'printInvoice'])->name('invoices.print');
+    // });
 
 
 
-    // -------------------- Stock --------------------
+    // Stock
     Route::prefix('stock')->group(function () {
-        Route::get('/', [PageController::class, 'stockPage'])->name('stock.page');
-        Route::get('/report', [StockController::class, 'stockReport'])->name('stock.report');
+        // Pages
+        Route::get('/', [PageController::class, 'stockPage'])->name('stock.page'); // stock page
+        Route::get('/report', [StockController::class, 'stockReport'])->name('stock.report'); // stock report page
 
+        // Actions
         Route::post('/create', [StockController::class, 'store'])->name('stock.create');
         Route::post('/update/{id}', [StockController::class, 'update'])->name('stock.update');
         Route::post('/delete/{id}', [StockController::class, 'destroy'])->name('stock.destroy');
     });
+
+    // Orders
+    Route::prefix('orders')->group(function () {
+        // Pages / API
+        Route::get('/list', [OrderController::class, 'listOrders'])->name('orders.list'); // orders list page
+        Route::post('/create', [OrderController::class, 'createOrder'])->name('orders.create'); // create order
+        Route::post('/update/{id}', [OrderController::class, 'update'])->name('orders.update');
+        Route::post('/delete/{id}', [OrderController::class, 'destroy'])->name('orders.delete');
+    });
+});
+Route::prefix('backend/admin')->middleware(['jwtTokenVerify', 'role:admin'])->group(function () {
+
+    // Create Sale Page
+    Route::get('/sales/create', [PageController::class, 'salesPage'])->name('sales.page');
+
+    // Store Sale & Invoice
+    Route::post('/sales/create', [SalesController::class, 'createInvoice'])->name('sales.create');
+
+    // Print Invoice
+    Route::get('/invoices/print/{id}', [InvoiceController::class, 'printInvoice'])->name('invoices.print');
 });
 
 
@@ -148,20 +182,16 @@ Route::middleware(JwtTokenVerify::class)->group(function () {
     // Customer Pages
     // Route::get('/dashboard', [PageController::class, 'dashboard'])->name('customer.dashboard');
     Route::get('/profile', [PageController::class, 'profile'])->name('profile');
-    Route::prefix('customer')->name('customer.')->group(function () {
-        // Product browsing / POS
-        Route::get('/products', [ProductController::class, 'customerProducts'])->name('products');
-        Route::get('/create-order', [OrderController::class, 'customerCreateOrderPage'])->name('create.order.page');
-        Route::post('/order/store', [OrderController::class, 'customerOrderStore'])->name('order.store');
+    Route::get('/customer/products', [ProductController::class, 'customerProducts'])->name('customer.products');
+    Route::post('/customer/product/order', [OrderController::class, 'customerOrderStore'])->name('customer.product.store');
+    Route::get('/customer/orders/list', [OrderController::class, 'customerOrders'])->name('customer.order.list');
+    Route::get('/customer/orders', [OrderController::class, 'adminCustomerOrders'])->name('admin.customer.orders');
 
-        // Customer order listing
-        Route::get('/order/list', [OrderController::class, 'customerOrders'])->name('order.list');
-
-        // Customer invoices
-        Route::get('/invoices', [InvoiceController::class, 'customerInvoices'])->name('invoices');
-    }); // API stats (optional for dashboard)
-    Route::get('api/orders/stats', [OrderController::class, 'getOrderStats'])->name('api.orders.stats');
-    Route::get('api/invoices/stats', [InvoiceController::class, 'getInvoiceStats'])->name('api.invoices.stats');
+    // Dashboard API stats (for Blade + Axios)
+    Route::get('/api/orders/stats', [OrderController::class, 'getOrderStats'])->name('api.order.stats');
+    Route::get('/api/invoices/stats', [InvoiceController::class, 'getInvoiceStats'])->name('api.invoice.stats');
+    Route::get('/api/invoices/stats', [DashboardController::class, 'invoiceStats'])->name('api.invoice.stats');
+    Route::get('/api/orders/stats', [DashboardController::class, 'orderStats'])->name('api.order.stats');
 });
 Route::get('/list-customer', [CustomerController::class, 'list'])->name('customer.list');
 Route::get('/list-product', [ProductController::class, 'index'])->name('product.list');

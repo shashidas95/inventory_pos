@@ -66,16 +66,17 @@
 
         <div id="adminNav" style="display: none;">
 
+
             <a href="{{ route('dashboard') }}"
                 class="side-bar-item {{ request()->routeIs('dashboard') ? 'side-bar-item-active' : '' }}">
                 <i class="bi bi-graph-up"></i>
                 <span class="side-bar-item-caption">Dashboard</span>
             </a>
 
-            <a href="{{ route('admin.customer.orders') }}" class="side-bar-item">
+            {{-- <a href="{{ route('invoices.show') }}" class="side-bar-item">
                 <i class="bi bi-people"></i>
                 <span class="side-bar-item-caption">Customer Orders</span>
-            </a>
+            </a> --}}
 
             {{-- Category List --}}
             <a href="{{ route('categories.index') }}"
@@ -83,7 +84,6 @@
                 <i class="bi bi-list-nested"></i>
                 <span class="side-bar-item-caption">Category</span>
             </a>
-
 
             <a href="{{ url('/backend/admin/products/list') }}" class="side-bar-item">
                 <i class="bi bi-bag"></i>
@@ -95,31 +95,29 @@
                 <span class="side-bar-item-caption">Add Product</span>
             </a>
 
-            {{-- <a href="{{ url('/salePage') }}" class="side-bar-item">
-                <i class="bi bi-currency-dollar"></i>
-                <span class="side-bar-item-caption">Create Sale</span>
-            </a> --}}
+            {{-- Create Customer (NEW LINK) --}}
+            <a href="{{ route('admin.customers.create') }}"
+                class="side-bar-item {{ request()->routeIs('admin.customers.create') ? 'side-bar-item-active' : '' }}">
+                <i class="bi bi-person-plus"></i>
+                <span class="side-bar-item-caption">Create Customer</span>
+            </a>
 
-            {{-- Sales --}}
-            <a href="{{ route('sales.create') }}" class="side-bar-item">
+            {{-- Create Sale --}}
+            <a href="{{ route('sales.page') }}" class="side-bar-item">
                 <i class="bi bi-currency-dollar"></i>
                 <span class="side-bar-item-caption">Create Sale</span>
             </a>
-            <a href="{{ route('sales.list') }}" class="side-bar-item">
+
+            {{-- Sales List --}}
+            {{-- <a href="{{ route('sales.list') }}" class="side-bar-item">
                 <i class="bi bi-list-check"></i>
                 <span class="side-bar-item-caption">Sales List</span>
-            </a>
+            </a> --}}
 
-            {{-- Invoices --}}
+            {{-- Invoices List --}}
             <a href="{{ route('invoices.list') }}" class="side-bar-item">
                 <i class="bi bi-receipt"></i>
-                <span class="side-bar-item-caption">Invoices list</span>
-            </a>
-
-            {{-- Invoices --}}
-            <a href="{{ route('invoices.print', ['id' => 1]) }}" class="side-bar-item">
-                <i class="bi bi-receipt"></i>
-                <span class="side-bar-item-caption">Invoices</span>
+                <span class="side-bar-item-caption">Invoices List</span>
             </a>
 
             {{-- Reports --}}
@@ -134,16 +132,6 @@
                 <span class="side-bar-item-caption">Orders</span>
             </a>
 
-
-            {{-- <a href="{{ url('/invoicePage') }}" class="side-bar-item">
-                <i class="bi bi-receipt"></i>
-                <span class="side-bar-item-caption">Invoice</span>
-            </a> --}}
-
-            {{-- <a href="{{ url('/reportPage') }}" class="side-bar-item">
-                <i class="bi bi-file-earmark-bar-graph"></i>
-                <span class="side-bar-item-caption">Report</span>
-            </a> --}}
 
         </div>
 
