@@ -7,6 +7,8 @@
 
         <form id="productForm" enctype="multipart/form-data" class="row g-3" method="">
             @csrf
+            @method('PUT')
+
             <!-- Product Image -->
             <div class="col-md-4 text-center">
                 <label class="form-label">Product Image</label>
@@ -22,35 +24,46 @@
             <!-- Product Info -->
             <div class="col-md-8">
                 <label class="form-label">Product Name</label>
-                <input id="name" type="text" class="form-control" value="{{ $product->name }}" required>
+                <input id="name" name="name" type="text" class="form-control" value="{{ $product->name }}"
+                    required>
 
                 <label class="form-label mt-2">Category</label>
-                <select id="category_id" class="form-select" required></select>
+                <select id="category_id" name="category_id" class="form-select" required></select>
 
                 <label class="form-label mt-2">Description</label>
-                <textarea id="description" class="form-control" rows="3">{{ $product->description }}</textarea>
+                <textarea id="description" name="description" class="form-control" rows="3">{{ $product->description }}</textarea>
 
                 <div class="row mt-2">
                     <div class="col-md-6">
-                        <label class="form-label">Quantity</label>
-                        <input id="quantity" type="number" min="0" class="form-control"
-                            value="{{ $product->quantity }}" required>
-                    </div>
-                    <div class="col-md-6">
                         <label class="form-label">Price ($)</label>
-                        <input id="price" type="number" min="0" step="0.01" class="form-control"
-                            value="{{ $product->price }}" required>
+                        <input id="price" name="price" type="number" min="0" step="0.01"
+                            class="form-control" value="{{ $product->price }}" required>
+
                     </div>
+                </div>
+
+                <!-- ✅ Per-store stock -->
+                <h5 class="mt-3">Store Stock</h5>
+                <div class="row">
+                    @foreach ($stores as $store)
+                        @php
+                            $stock = $product->stores->where('id', $store->id)->first();
+                        @endphp
+                        <div class="col-md-6 mt-2">
+                            <label class="form-label">{{ $store->name }}</label>
+                            <input type="number" class="form-control store-qty" data-store-id="{{ $store->id }}"
+                                name="stores[{{ $store->id }}]" min="0"
+                                value="{{ $stock ? $stock->pivot->quantity : 0 }}">
+                        </div>
+                    @endforeach
                 </div>
 
                 <button type="button" class="btn btn-primary mt-3 w-100" onclick="updateProduct()">Update
                     Product</button>
             </div>
-
         </form>
     </div>
 </div>
-
 
 @push('script')
     <script>
@@ -59,13 +72,13 @@
         // ✅ Live image preview
         function previewImage(event) {
             let reader = new FileReader();
-            reader.onload = function() {
+            reader.onload = () => {
                 document.getElementById('productImage').src = reader.result;
             };
             reader.readAsDataURL(event.target.files[0]);
         }
 
-        // Load categories
+        // ✅ Load categories dynamically
         async function loadCategories(selectedId) {
             try {
                 const res = await axios.get('/backend/admin/categories/json');
@@ -84,15 +97,11 @@
             }
         }
 
+        // ✅ Update product
         async function updateProduct() {
-            const formData = new FormData();
-            formData.append('name', document.getElementById('name').value);
-            formData.append('description', document.getElementById('description').value);
-            formData.append('quantity', document.getElementById('quantity').value);
-            formData.append('price', document.getElementById('price').value);
-            formData.append('category_id', document.getElementById('category_id').value);
-            formData.append('_method', 'PUT');
+            const formData = new FormData(document.getElementById('productForm'));
 
+            // Append image if selected
             const imageFile = document.getElementById('imageFile').files[0];
             if (imageFile) formData.append('image', imageFile);
 
@@ -109,14 +118,20 @@
                 } else {
                     alert(res.data.message || 'Update failed');
                 }
-
             } catch (err) {
-                console.error(err.response ? err.response.data : err);
-                alert('Unexpected error occurred. Check console.');
+                if (err.response && err.response.status === 422) {
+                    // Validation errors
+                    let errors = err.response.data.errors;
+                    for (let field in errors) {
+                        alert(errors[field][0]);
+                    }
+                } else {
+                    console.error(err.response ? err.response.data : err);
+                    alert('Unexpected error occurred. Check console.');
+                }
             }
         }
 
-        // Load categories on page load
         loadCategories("{{ $product->category_id }}");
     </script>
 @endpush

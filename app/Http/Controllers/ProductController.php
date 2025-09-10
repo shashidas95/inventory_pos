@@ -2,51 +2,102 @@
 
 namespace App\Http\Controllers;
 
-// use Storage;
-use Exception;
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\Store;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
-    public function index(): JsonResponse
+    // Admin: List all products
+    public function adminProductList()
     {
-        $products = Product::orderBy('name', 'asc')->get();
-        if ($products->isNotEmpty()) {
-            return response()->json([
-                'status' => 'success',
-                'data' => $products,
-                'message' => 'Product found.'
-            ]);
-        } else {
-            return response()->json([
-                'status' => 'error',
-                'data' => '',
-                'message' => 'Product not found'
-            ]);
-        }
+        $products = Product::with('stores')->orderBy('name', 'asc')->get();
+        return view('pages.dashboard.admin.products.list', compact('products'));
     }
-    public function adminProductCreate(Request $request)
+
+    // Admin: Show product creation form
+    public function adminProductCreate()
     {
         $categories = Category::all();
-
-        return view('pages.dashboard.products.product-page', compact('categories'));
+        $stores = Store::all();
+        return view('pages.dashboard.products.product-page', compact('categories', 'stores'));
     }
-    public function store(Request $request): JsonResponse
-    {
 
+    // Admin: Store new product with store stock
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'category_id' => 'required|exists:categories,id',
+            'description' => 'required|string',
+            'price' => 'required|numeric',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:1024',
+            'stores' => 'required|array|min:1',
+            'stores.*.store_id' => 'required|exists:stores,id',
+            'stores.*.quantity' => 'required|integer|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'errors' => $validator->errors(),
+                'message' => 'Validation error!'
+            ], 422);
+        }
+
+        // Handle image
+        $path = null;
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('products', 'public');
+        }
+
+        // Create product with quantity = 0 (multi-store stock is in pivot table)
+        $product = Product::create([
+            'name' => $request->name,
+            'category_id' => $request->category_id,
+            'description' => $request->description,
+            'price' => $request->price,
+            'image' => $path,
+            'quantity' => 0, // avoid SQL error
+        ]);
+
+        // Attach stores with quantities
+        foreach ($request->stores as $store) {
+            $product->stores()->attach($store['store_id'], ['quantity' => $store['quantity']]);
+        }
+
+        return response()->json([
+            'status' => true,
+            'data' => $product,
+            'message' => 'Product created successfully with store stock!'
+        ], 201);
+    }
+
+
+    // Admin: Show edit form
+    public function adminProductEdit(Product $product)
+    {
+        $categories = Category::all();
+        $stores = Store::all();
+        $product->load('stores');
+        return view('pages.dashboard.products.product-edit', compact('categories', 'stores', 'product'));
+    }
+
+    // Admin: Update product & store stock
+    public function update(Product $product, Request $request): JsonResponse
+    {
         $validator = Validator::make($request->all(), [
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
             'description' => 'required|string',
             'price' => 'required|numeric',
-            'quantity' => 'required|integer',
             'image' => 'nullable|image|mimes:jpeg,png,jpg|max:1024',
+            'stores' => 'required|array|min:1', // now stores is like ['1' => 10, '2' => 0]
+            'stores.*' => 'required|integer|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -54,122 +105,71 @@ class ProductController extends Controller
                 'status' => 'error',
                 'errors' => $validator->errors(),
                 'message' => 'Validation error!'
-            ]);
-        }
-
-        $productData = $request->except('image');
-
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('products', 'public');
-        }
-        $productData['image'] = $path;
-        $product = Product::create($productData);
-        return response()->json([
-            'status' => 'success',
-            'data'   => $product,
-            'message' => 'Product created successfully'
-        ]);
-    }
-
-    public function adminProductEdit(Product $product)
-    {
-        $categories = Category::all();
-        return view('pages.dashboard.products.product-edit', compact('categories', 'product'));
-    }
-
-
-    public function show(Product $product): JsonResponse
-    {
-
-        try {
-            if (!empty($product)) {
-                return response()->json([
-                    'status' => 'success',
-                    'data' => $product,
-                    'message' => 'Product found.'
-                ]);
-            }
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'data' => '',
-                'message' => 'Product not found'
-            ]);
-        }
-    }
-    public function adminProductShow($product_id)
-    {
-        $product = Product::findOrFail($product_id);
-        return response()->json([
-            'status' => 'success',
-            'data' => $product
-        ]);
-    }
-    public function update(Product $product, Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'category_id' => 'required|exists:categories,id',
-            'name'        => 'required|string|max:255',
-            'description' => 'required|string',
-            'price'       => 'required|numeric',
-            'quantity'    => 'required|integer',
-            'image'       => 'nullable|image|mimes:jpeg,png,jpg|max:1024',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status'  => 'error',
-                'errors'  => $validator->errors(),
-                'message' => 'Validation error!',
             ], 422);
         }
 
-        // Only update image if uploaded
+        // Update image if uploaded
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('products', 'public');
-            $product->image = $path;
+            if ($product->image && Storage::disk('public')->exists($product->image)) {
+                Storage::disk('public')->delete($product->image);
+            }
+            $product->image = $request->file('image')->store('products', 'public');
         }
 
-        $product->update([
-            'category_id' => $request->category_id,
-            'name'        => $request->name,
-            'description' => $request->description,
-            'price'       => $request->price,
-            'quantity'    => $request->quantity,
-        ]);
+        $product->update($request->only(['category_id', 'name', 'description', 'price']));
+
+        // Sync stores with quantities
+        $syncData = [];
+        foreach ($request->stores as $storeId => $quantity) {
+            $syncData[$storeId] = ['quantity' => (int)$quantity];
+        }
+        $product->stores()->sync($syncData);
 
         return response()->json([
-            'status'  => 'success',
-            'data'    => $product,
+            'status' => 'success',
+            'data' => $product->load('stores'),
             'message' => 'Product updated successfully.'
         ]);
     }
 
-
-
-    public function adminProductList()
-    {
-        $products = Product::orderBy('name', 'asc')->get();
-
-        return view('pages.dashboard.admin.products.list', compact('products'));
-    }
-
+    // Admin: Delete product
     public function adminProductDelete(Product $product)
     {
-        // Delete image from storage if exists
         if ($product->image && Storage::exists($product->image)) {
             Storage::delete($product->image);
         }
-
+        $product->stores()->detach();
         $product->delete();
 
         return redirect()->route('admin.products.adminProductList')->with('success', 'Product deleted successfully.');
     }
 
-    public function customerProducts()
+    // Customer: List products for a specific store
+    public function customerProducts($storeId = null)
     {
-        $products = Product::orderBy('name', 'asc')->get();
+        $query = Product::query()->with(['stores' => function ($q) use ($storeId) {
+            if ($storeId) $q->where('store_id', $storeId);
+        }]);
 
-        return view('pages.dashboard.customers.products.list', compact('products'));
+        if ($storeId) {
+            $query->whereHas('stores', function ($q) use ($storeId) {
+                $q->where('store_id', $storeId)->where('quantity', '>', 0);
+            });
+        }
+
+        $products = $query->orderBy('name', 'asc')->get();
+
+        return view('pages.dashboard.customers.products.list', compact('products', 'storeId'));
+    }
+
+    // Public API: Get products JSON
+    public function index(): JsonResponse
+    {
+        $products = Product::with('stores')->orderBy('name', 'asc')->get();
+        return response()->json([
+            'status' => $products->isEmpty() ? 'error' : 'success',
+            'data' => $products,
+            'message' => $products->isEmpty() ? 'No products found' : 'Products fetched successfully'
+        ]);
     }
 }

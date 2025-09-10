@@ -18,7 +18,6 @@ class RegisterController extends Controller
 {
     public function register(RegisterRequest $request): JsonResponse
     {
-
         $validated = $request->validated();
         $userData = Arr::only($validated, ['email', 'password', 'name', 'role']);
         $profileData = Arr::only($validated, ['phone', 'address']);

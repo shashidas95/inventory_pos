@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Models\User;
+use App\Models\Store;
 use App\Models\Product;
 use App\Models\Category;
 use Illuminate\Http\Request;
@@ -56,8 +58,10 @@ class PageController extends Controller
     {
 
         $products = Product::all(); // fetch all products
+        $stores = Store::all();
+        $customers = User::where('role', 'customer')->get(); // ✅ fetch here
 
-        return view('pages.dashboard.admin.sales.sale-page', compact('products'));
+        return view('pages.dashboard.admin.sales.sale-page', compact('products', 'stores', 'customers'));
     }
 
     public function stockPage()
@@ -67,7 +71,8 @@ class PageController extends Controller
 
     public function invoicePage()
     {
-        return view('pages.dashboard.admin.invoices.invoice-page');
+        $customers = User::where('role', 'customer')->get(); // ✅ fetch here
+        return view('pages.dashboard.admin.invoices.invoice-page', compact('customers'));
     }
 
     public function ordersPage()

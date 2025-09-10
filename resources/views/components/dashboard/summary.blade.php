@@ -19,13 +19,6 @@
                         'value' => $categoriesCount,
                         'url' => route('categories.index'),
                     ],
-                    // [
-                    //     'id' => 'customer',
-                    //     'label' => 'Customers',
-                    //     'currency' => false,
-                    //     'value' => $customersCount,
-                    //     'url' => route('customers.list'),
-                    // ],
                     [
                         'id' => 'invoice',
                         'label' => 'Invoices',
@@ -41,26 +34,26 @@
                         'url' => route('orders.list'),
                     ],
                     [
-                        'id' => 'total',
+                        'id' => 'today-sales',
+                        'label' => "Today's Sale",
+                        'currency' => true,
+                        'value' => $todaySales,
+                        'url' => route('api.sales.stats'),
+                    ],
+                    [
+                        'id' => 'month-sales',
+                        'label' => "This Month's Sale",
+                        'currency' => true,
+                        'value' => $monthSales,
+                        'url' => route('api.sales.stats'),
+                    ],
+                    [
+                        'id' => 'total-sales',
                         'label' => 'Total Sale',
                         'currency' => true,
                         'value' => $totalSales,
-                        'url' => route('invoices.list'),
+                        'url' => route('api.sales.stats'),
                     ],
-                    // [
-                    //     'id' => 'vat',
-                    //     'label' => 'VAT Collection',
-                    //     'currency' => true,
-                    //     'value' => $vat,
-                    //     'url' => route('invoices.list'),
-                    // ],
-                    // [
-                    //     'id' => 'payable',
-                    //     'label' => 'Total Collection',
-                    //     'currency' => true,
-                    //     'value' => $payable,
-                    //     'url' => route('invoices.list'),
-                    // ],
                 ];
             } else {
                 $cards = [
@@ -112,8 +105,6 @@
             </div>
         @endforeach
 
-
-
     </div>
 
     <hr class="my-4">
@@ -122,12 +113,6 @@
         <h2>Welcome, {{ $user->name }} ({{ ucfirst($user->role) }})</h2>
 
         @if ($user->role === 'admin')
-            <div class="row my-3">
-                <div>Total Sales Today: {{ $todaySales ?? 0 }}</div>
-                <div>Total Sales This Month: {{ $monthSales ?? 0 }}</div>
-                <div>Total Sales Overall: {{ $totalSales ?? 0 }}</div>
-            </div>
-
             <h3>Recent Orders</h3>
             <ul>
                 @foreach ($recentOrders as $order)
@@ -138,16 +123,11 @@
             <h3>Recent Invoices</h3>
             <ul>
                 @foreach ($recentInvoices as $invoice)
-                    <li>Invoice #{{ $invoice->id }} - Amount: {{ $invoice->total_amount }}</li>
+                    <li>Invoice #{{ $invoice->id }} - Amount: {{ $invoice->final_total ?? $invoice->total_amount }}
+                    </li>
                 @endforeach
             </ul>
         @else
-            <div class="row my-3">
-                <div>Total Orders: {{ $totalOrders ?? 0 }}</div>
-                <div>Total Invoices: {{ $totalInvoices ?? 0 }}</div>
-                <div>Total Spent: {{ $totalSpent ?? 0 }}</div>
-            </div>
-
             <h3>Your Recent Orders</h3>
             <ul>
                 @foreach ($orders as $order)
@@ -158,47 +138,55 @@
             <h3>Your Recent Invoices</h3>
             <ul>
                 @foreach ($invoices as $invoice)
-                    <li>Invoice #{{ $invoice->id }} - Amount: {{ $invoice->total_amount }}</li>
+                    <li>Invoice #{{ $invoice->id }} - Amount: {{ $invoice->final_total ?? $invoice->total_amount }}
+                    </li>
                 @endforeach
             </ul>
         @endif
     </div>
 </div>
 
-@push('scripts')
+@push('script')
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const role = "{{ $user->role }}";
 
             if (role === 'admin') {
-                axios.get('{{ route('api.invoices.stats') }}')
-                    .then(res => {
-                        const data = res.data;
-                        document.getElementById('invoice').textContent = data.total_invoices ?? 0;
-                        document.getElementById('total').textContent = data.total_amount ?? 0;
-                        // document.getElementById('vat').textContent = data.vat ?? 0;
-                        // document.getElementById('payable').textContent = data.payable ?? 0;
-                    });
-
+                // Fetch overall stats (products, categories, orders, invoices)
                 axios.get('{{ route('api.orders.stats') }}')
                     .then(res => {
                         const data = res.data;
                         document.getElementById('orders').textContent = data.total_orders ?? 0;
                         document.getElementById('product').textContent = data.total_products ?? 0;
                         document.getElementById('category').textContent = data.total_categories ?? 0;
-                        document.getElementById('customer').textContent = data.total_customers ?? 0;
-                    });
-            } else {
-                axios.get('{{ route('api.invoices.stats') }}')
-                    .then(res => {
-                        document.getElementById('my-invoices').textContent = res.data.total_invoices ?? 0;
+                        if (document.getElementById('customer'))
+                            document.getElementById('customer').textContent = data.total_customers ?? 0;
                     });
 
-                axios.get('{{ route('api.orders.stats') }}')
+                axios.get('{{ route('api.invoices.stats') }}')
                     .then(res => {
-                        document.getElementById('my-orders').textContent = res.data.total_orders ?? 0;
+                        const data = res.data;
+                        document.getElementById('invoice').textContent = data.total_invoices ?? 0;
                     });
+
+                // Fetch sales-specific stats (Today, Month, Total) live
+                axios.get('{{ route('api.sales.stats') }}')
+                    .then(res => {
+                        const data = res.data;
+                        document.getElementById('today-sales').textContent = data.todaySales ?? 0;
+                        document.getElementById('month-sales').textContent = data.monthSales ?? 0;
+                        document.getElementById('total-sales').textContent = data.totalSales ?? 0;
+                    })
+                    .catch(err => console.error("Sales stats error:", err));
+
+            } else {
+                // Customer view
+                axios.get('{{ route('api.invoices.stats') }}')
+                    .then(res => document.getElementById('my-invoices').textContent = res.data.total_invoices ?? 0);
+
+                axios.get('{{ route('api.orders.stats') }}')
+                    .then(res => document.getElementById('my-orders').textContent = res.data.total_orders ?? 0);
             }
         });
     </script>

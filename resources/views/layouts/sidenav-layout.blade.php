@@ -72,6 +72,11 @@
                 <i class="bi bi-graph-up"></i>
                 <span class="side-bar-item-caption">Dashboard</span>
             </a>
+            {{-- Assign Store Users --}}
+            <a href="{{ route('store.users.index') }}" class="side-bar-item">
+                <i class=" <i class="fas fa-user-cog""></i>
+                <span class="side-bar-item-caption">Assign Store Users</span>
+            </a>
 
             {{-- <a href="{{ route('invoices.show') }}" class="side-bar-item">
                 <i class="bi bi-people"></i>

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PosController;
 use App\Http\Middleware\JwtTokenVerify;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\SalesController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\Web\PageController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\StoreUserController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\User\ProfileController;
@@ -37,6 +39,18 @@ Route::prefix('backend')->group(function () {
 
 // -------------------- BACKEND ADMIN APIs --------------------
 Route::prefix('backend/admin')->middleware([JwtTokenVerify::class, 'role:admin'])->group(function () {
+
+    Route::prefix('store-users')->group(function () {
+
+        // Manage store users page
+        Route::get('/', [StoreUserController::class, 'index'])->name('store.users.index');
+
+        // Assign user to store
+        Route::post('/assign', [StoreUserController::class, 'assign'])->name('store.users.assign');
+
+        // Remove user from store
+        Route::delete('/{store}/{user}', [StoreUserController::class, 'remove'])->name('store.users.remove');
+    });
 
     // Admin Customer routes
     Route::prefix('customers')->group(function () {
@@ -104,6 +118,9 @@ Route::prefix('backend/admin')->middleware([JwtTokenVerify::class, 'role:admin']
         Route::post('/update/{id}', [StockController::class, 'update'])->name('stock.update');
         Route::post('/delete/{id}', [StockController::class, 'destroy'])->name('stock.destroy');
     });
+    Route::get('/api/sales-stats', [DashboardController::class, 'salesStats'])->name('api.sales.stats');
+    Route::get('/invoice/{id}/print', [PosController::class, 'printReceipt']);
+    Route::post('/checkout', [PosController::class, 'checkout']);
 });
 
 
@@ -112,7 +129,7 @@ Route::prefix('backend/admin')->middleware([JwtTokenVerify::class, 'role:admin']
 
 
 // -------------------- ADMIN UI PAGES (Blade) --------------------
-Route::prefix('admin')->middleware([JwtTokenVerify::class, 'role:admin'])->group(function () {
+Route::prefix('admin')->middleware([JwtTokenVerify::class, 'role:admin,manager'])->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name(name: 'admin.dashboard');

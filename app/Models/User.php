@@ -4,11 +4,12 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Otp;
+use App\Models\Store;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Notifications\Notifiable;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class User extends Authenticatable
@@ -26,7 +27,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role'
+        'role',
+        'store_id'
     ];
 
     /**
@@ -73,5 +75,24 @@ class User extends Authenticatable
     {
         return $this->hasOne(Profile::class);
     }
- 
+    // A user can belong to many stores
+    public function stores()
+    {
+        return $this->belongsToMany(Store::class, 'store_user')
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    // Check if user is global admin
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    // Store-specific role check
+    public function storeRole($storeId): ?string
+    {
+        $store = $this->stores()->where('store_id', $storeId)->first();
+        return $store ? $store->pivot->role : null;
+    }
 }

@@ -10,7 +10,8 @@
                     <th>Category</th>
                     <th>Description</th>
                     <th>Price</th>
-                    <th>Quantity</th>
+                    <th>Total stock</th>
+                    <th> stock Per store </th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -18,23 +19,41 @@
                 @foreach ($products as $product)
                     <tr>
                         <td>
-                            <img src="{{ asset('storage/' . $product->image) }}"
-                                style="width:60px; height:60px; object-fit:cover;" />
+                            {{-- <img src="{{ asset('storage/' . $product->image) }}"
+                                style="width:60px; height:60px; object-fit:cover;" /> --}}
+                            @if ($product->image)
+                                <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}"
+                                    width="60" class="rounded">
+                            @else
+                                <span class="text-muted">No Image</span>
+                            @endif
                         </td>
                         <td>{{ $product->name }}</td>
                         <td>{{ $product->category ? $product->category->name : '' }}</td>
                         <td>{{ $product->description }}</td>
                         <td>{{ $product->price }}</td>
-                        <td>{{ $product->quantity }}</td>
+                        {{-- Total stock (sum of all store quantities) --}}
+                        <td><strong>{{ $product->total_quantity }}</strong></td>
+
+                        {{-- Per store breakdown --}}
                         <td>
-                            <a href="{{ route('admin.products.adminProductEdit', $product->id) }}">Edit</a>
+                            <ul class="list-unstyled mb-0">
+                                @foreach ($product->stores as $store)
+                                    <li>
+                                        <span class="fw-bold">{{ $store->name }}:</span>
+                                        {{ $store->pivot->quantity }}
+                                    </li>
+                                @endforeach
+                            </ul>
                         </td>
+
+
                         <td>
                             <a href="{{ route('admin.products.adminProductEdit', $product->id) }}"
                                 class="btn btn-sm btn-warning">Edit</a>
 
-                            <form action="{{ route('admin.products.adminProductDelete', $product->id) }}" method="POST"
-                                style="display:inline-block;"
+                            <form action="{{ route('admin.products.adminProductDelete', $product->id) }}"
+                                method="POST" style="display:inline-block;"
                                 onsubmit="return confirm('Are you sure you want to delete this product?')">
                                 @csrf
                                 @method('DELETE')

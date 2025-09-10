@@ -12,20 +12,26 @@ use Illuminate\Support\Facades\Auth;
 
 class OrderController extends Controller
 {
-    // Admin: Create order for a customer (single or multi-product)
+    // Admin / Manager: Create order for a customer
     public function createOrder(Request $request)
     {
+        $user = auth()->user();
         $request->validate([
             'user_id' => 'required|exists:users,id',
+            'store_id' => $user->role === 'manager' ? '' : 'required|exists:stores,id', // manager store forced
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|exists:products,id',
             'products.*.quantity' => 'required|integer|min:1',
         ]);
 
+        // Force store_id if manager
+        $storeId = $user->role === 'manager' ? $user->store_id : $request->store_id;
+
         $order = Order::create([
             'user_id' => $request->user_id,
+            'store_id' => $storeId,
             'status' => 'pending',
-            'total' => 0, // will calculate below
+            'total' => 0,
         ]);
 
         $totalAmount = 0;
@@ -39,52 +45,63 @@ class OrderController extends Controller
                 'product_id' => $product->id,
                 'quantity' => $item['quantity'],
                 'price' => $product->price,
+                'store_id' => $storeId,
             ]);
         }
 
         $order->update(['total' => $totalAmount]);
 
-        return response()->json(['status' => 'success', 'order' => $order->load('details.product')]);
+        return response()->json([
+            'status' => 'success',
+            'order' => $order->load('details.product')
+        ]);
     }
 
-    // Customer: Create multi-product POS order
-    // Customer: create multi-product POS order
+    // Customer: Create POS order
     public function customerOrderStore(Request $request)
     {
-
+        $user = auth()->user();
         $request->validate([
+            'store_id' => $user->role === 'manager' ? '' : 'required|exists:stores,id',
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|exists:products,id',
             'products.*.qty' => 'required|integer|min:1',
-            'vat' => 'nullable|numeric',
-            'discount' => 'nullable|numeric',
+            'vat' => 'nullable|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
         ]);
 
-        $userId = Auth::id();
+        $userId = $user->id;
+        $storeId = $user->role === 'manager' ? $user->store_id : $request->store_id;
         $vat = $request->vat ?? 0;
         $discount = $request->discount ?? 0;
 
-        $total = 0;
+        $subtotal = 0;
         $orderDetails = [];
 
         foreach ($request->products as $p) {
             $product = Product::findOrFail($p['product_id']);
-            $amount = $product->price * $p['qty'];
-            $total += $amount;
+            $lineTotal = $product->price * $p['qty'];
+            $subtotal += $lineTotal;
 
             $orderDetails[] = [
                 'product_id' => $product->id,
                 'quantity' => $p['qty'],
-                'price' => $product->price
+                'price' => $product->price,
+                'store_id' => $storeId,
             ];
         }
 
-        $totalWithVatDiscount = $total + ($total * $vat / 100) - $discount;
+        $vatAmount = ($subtotal * $vat) / 100;
+        $total = $subtotal + $vatAmount - $discount;
 
         $order = Order::create([
             'user_id' => $userId,
+            'store_id' => $storeId,
             'status' => 'pending',
-            'total' => $totalWithVatDiscount
+            'subtotal' => $subtotal,
+            'vat' => $vatAmount,
+            'discount' => $discount,
+            'total' => $total
         ]);
 
         foreach ($orderDetails as $detail) {
@@ -92,19 +109,29 @@ class OrderController extends Controller
             OrderDetail::create($detail);
         }
 
-        return response()->json(['status' => 'success', 'data' => $order]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Order created successfully!',
+            'order' => $order->load('details.product')
+        ]);
     }
-    // Admin: List all orders
+
+    // Admin / Manager: List orders
     public function listOrders()
     {
-        $orders = Order::with('user', 'details.product')->latest()->get();
+        $user = auth()->user();
+        $orders = Order::with('user', 'store', 'details.product')
+            ->when($user->role === 'manager', fn($q) => $q->where('store_id', $user->store_id))
+            ->latest()
+            ->get();
+
         return view('pages.dashboard.admin.orders.index', compact('orders'));
     }
 
-    // Customer: List own orders (JSON for dashboard)
+    // Customer: List own orders
     public function customerOrders()
     {
-        $orders = Order::with('details.product')
+        $orders = Order::with('details.product', 'store')
             ->where('user_id', Auth::id())
             ->latest()
             ->get();
@@ -112,35 +139,67 @@ class OrderController extends Controller
         return view('components.dashboard.customers.orders.order-list', compact('orders'));
     }
 
-    // Admin: Update order
+    // Admin / Manager: Update order
     public function update(Request $request, $id)
     {
+        $user = auth()->user();
+        $request->validate([
+            'status' => 'required|in:pending,completed,cancelled',
+            'total' => 'nullable|numeric|min:0',
+        ]);
+
         $order = Order::findOrFail($id);
+
+        // Manager can only update orders from their store
+        if ($user->role === 'manager' && $order->store_id !== $user->store_id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized to update this order.'
+            ], 403);
+        }
+
         $order->update($request->only(['status', 'total']));
-        return response()->json(['status' => 'success', 'data' => $order]);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $order->load('details.product', 'store', 'user')
+        ]);
     }
 
-    // Admin: Delete order
+    // Admin / Manager: Delete order
     public function destroy($id)
     {
+        $user = auth()->user();
         $order = Order::findOrFail($id);
+
+        if ($user->role === 'manager' && $order->store_id !== $user->store_id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized to delete this order.'
+            ], 403);
+        }
+
         $order->details()->delete();
         $order->delete();
-        return response()->json(['status' => 'success', 'message' => 'Order deleted']);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Order deleted successfully'
+        ]);
     }
 
-    // Dashboard stats for Axios
+    // Dashboard stats (store-aware)
     public function getOrderStats()
     {
         $user = auth()->user();
 
-        if ($user->role === 'admin') {
+        if ($user->role === 'admin' || $user->role === 'super_admin') {
             $totalOrders = Order::count();
             $totalProducts = Product::count();
             $totalCategories = Category::count();
             $totalCustomers = User::where('role', 'customer')->count();
-        } else {
-            $totalOrders = Order::where('user_id', $user->id)->count();
+        } else { // manager
+            $totalOrders = Order::where('store_id', $user->store_id)->count();
             $totalProducts = $totalCategories = $totalCustomers = 0;
         }
 
@@ -151,11 +210,24 @@ class OrderController extends Controller
             'total_customers' => $totalCustomers
         ]);
     }
-
-    // Admin: List orders for all customers (Blade view)
-    public function adminCustomerOrders()
+    // Admin / Manager: Show single order
+    public function show($id)
     {
-        $orders = Order::with('details.product', 'user')->latest()->get();
-        return view('pages.dashboard.admin.orders.index', compact('orders'));
+        $user = auth()->user();
+
+        $order = Order::with('details.product', 'store', 'user')->findOrFail($id);
+
+        // Manager can only view orders from their store
+        if ($user->role === 'manager' && $order->store_id !== $user->store_id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized to view this order.'
+            ], 403);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'order' => $order
+        ]);
     }
 }

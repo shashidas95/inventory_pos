@@ -4,11 +4,8 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-
 use App\Models\Order;
-use App\Models\OrderDetail;
 use App\Models\Invoice;
-use App\Models\InvoiceDetail;
 use App\Models\Product;
 
 class SaleService
@@ -18,75 +15,101 @@ class SaleService
         DB::beginTransaction();
 
         try {
-            // 1. Create Order
+            // 1️⃣ Create Order
             $order = Order::create([
                 'user_id' => $data['customer_id'],
-                'status'  => 'completed',
-                'total'   => 0, // will calculate later
+                'store_id' => $data['store_id'],
+                'status' => 'completed',
+                'total' => 0,
             ]);
 
-            $subtotal = 0;
+            $orderSubtotal = 0;       // sum of price * qty
+            $invoiceSubtotal = 0;     // sum after per-line discount
+            $invoiceTotal = 0;        // sum after VAT
+            $vatPercentage = $data['vat'] ?? 0;
+            $globalDiscount = $data['discount'] ?? 0;
 
-            // 2. Process products
+            $invoiceDetailsData = [];
+
+            // 2️⃣ Process Products
             foreach ($data['products'] as $item) {
+                $item['price'] = floatval($item['price']);
+                $item['qty']   = intval($item['qty']);
+                $itemDiscount  = floatval($item['discount'] ?? 0);
+
                 $product = Product::lockForUpdate()->findOrFail($item['product_id']);
 
-                if ($product->quantity < $item['qty']) {
-                    throw new \Exception("Insufficient stock for product {$product->name}");
+                // Check & deduct store stock
+                $storeStock = $product->stores()->where('store_id', $data['store_id'])->first();
+                if (!$storeStock || $storeStock->pivot->quantity < $item['qty']) {
+                    throw new \Exception("Insufficient stock for product {$product->name} in store ID {$data['store_id']}");
                 }
 
-                $product->quantity -= $item['qty'];
-                $product->save();
-
-                $lineTotal = $item['price'] * $item['qty'];
-                $subtotal += $lineTotal;
-
-                // Order Details
-                $order->details()->create([
-                    'product_id' => $product->id,
-                    'quantity'   => $item['qty'],
-                    'price'      => $item['price'],
+                $product->stores()->updateExistingPivot($data['store_id'], [
+                    'quantity' => $storeStock->pivot->quantity - $item['qty'],
                 ]);
+
+                // Line calculations
+                $lineTotal = $item['price'] * $item['qty'];
+                $lineSubtotal = max(0, $lineTotal - $itemDiscount);
+                $lineVatAmount = $lineSubtotal * ($vatPercentage / 100);
+                $lineFinalTotal = $lineSubtotal + $lineVatAmount;
+
+                $orderSubtotal += $lineTotal;
+                $invoiceSubtotal += $lineSubtotal;
+                $invoiceTotal += $lineFinalTotal;
+
+                // Order details
+                $order->details()->create([
+                    'product_id'   => $product->id,
+                    'store_id'     => $data['store_id'],
+                    'quantity'     => $item['qty'],
+                    'price'        => $item['price'],
+                    'unit_price'   => $item['price'],
+                    'total_amount' => $lineTotal,
+                ]);
+
+                // Invoice details
+                $invoiceDetailsData[] = [
+                    'product_id'      => $product->id,
+                    'store_id'        => $data['store_id'],
+                    'quantity'        => $item['qty'],
+                    'unit_price'      => $item['price'],
+                    'total_amount'    => $lineTotal,
+                    'discount_amount' => $itemDiscount,
+                    'subtotal_amount' => $lineSubtotal,
+                    'vat_percentage'  => $vatPercentage,
+                    'vat_amount'      => $lineVatAmount,
+                    'final_total'     => $lineFinalTotal,
+                ];
             }
 
-            // 3. Calculate VAT & Discount
-            $vatPercentage  = $data['vat'] ?? 5;
-            $discountAmount = $data['discount'] ?? 0;
+            // 3️⃣ Update order total
+            $order->update(['total' => $invoiceTotal - $globalDiscount]);
 
-            $vatAmount  = $subtotal * ($vatPercentage / 100);
-            $finalTotal = $subtotal + $vatAmount - $discountAmount;
-
-         
-
-            // Update order total
-            $order->total = $finalTotal;
-            $order->save();
-
-            // 4. Create Invoice
+            // 4️⃣ Create invoice
             $invoice = Invoice::create([
-                'customer_id'     => $data['customer_id'],
-                'user_id'         => auth()->id(),
-                'order_id'        => $order->id,
-                'invoice_number'  => 'INV-' . time(),
-                'invoice_date'    => now(),
-                'subtotal_amount' => $subtotal,
-                'vat_percentage'  => $vatPercentage,
-                'vat_amount'      => $vatAmount,
-                'discount_amount' => $discountAmount,
-                'final_total'     => $finalTotal,
-                'status'          => 'paid',
+                'customer_id'    => $data['customer_id'],
+                'user_id'        => auth()->id(),
+                'store_id'       => $data['store_id'],
+                'order_id'       => $order->id,
+                'invoice_number' => 'INV-' . time(),
+                'invoice_date'   => now(),
+                'total_amount'   => $orderSubtotal,
+                'subtotal_amount' => $invoiceSubtotal,
+                'vat_percentage' => $vatPercentage,
+                'vat_amount'     => $invoiceTotal - $invoiceSubtotal,
+                'discount_amount' => $globalDiscount,
+                'final_total'    => max(0, $invoiceTotal - $globalDiscount),
+                'status'         => 'paid',
             ]);
 
-            // 5. Create Invoice Details
-            foreach ($data['products'] as $item) {
-                $product = Product::findOrFail($item['product_id']);
-                $invoice->invoiceDetails()->create([
-                    'product_id'   => $product->id,
-                    'quantity'     => $item['qty'],
-                    'amount'       => $item['price'],
-                    'total_amount' => $item['price'] * $item['qty'],
-                ]);
+            // 5️⃣ Save invoice details
+            foreach ($invoiceDetailsData as $detail) {
+                $invoice->invoiceDetails()->create($detail);
             }
+
+            Log::info("Order subtotal: $orderSubtotal, Invoice subtotal: $invoiceSubtotal, VAT: " . ($invoiceTotal - $invoiceSubtotal) . ", Discount: $globalDiscount, Final total: " . ($invoiceTotal - $globalDiscount));
 
             DB::commit();
             return $invoice;

@@ -2,16 +2,28 @@
     <h2 class="mb-4 text-center">Create Sale / Invoice</h2>
 
     <form id="create-sale-form">
+        {{-- Store  --}}
+        <div class="mb-4">
+            <label for="customer" class="form-label fw-bold">Select Store:</label>
+            <select id="store_id" class="form-control">
+                <option value="">-- Select Store --</option>
+                @foreach ($stores as $store)
+                    <option value="{{ $store->id }}">{{ $store->name }}</option>
+                @endforeach
+            </select>
+        </div>
+
         {{-- Customer --}}
         <div class="mb-4">
             <label for="customer" class="form-label fw-bold">Select Customer:</label>
             <select id="customer" name="customer_id" class="form-select form-select-lg" required>
                 <option value="">-- Select Customer --</option>
-                @foreach (\App\Models\User::where('role', 'customer')->get() as $customer)
+                @foreach ($customers as $customer)
                     <option value="{{ $customer->id }}">{{ $customer->name }}</option>
                 @endforeach
             </select>
         </div>
+
 
         {{-- Products Table --}}
         <div class="table-responsive shadow-sm rounded mb-4">
@@ -79,6 +91,7 @@
                 <span>Payable:</span> <span id="payable">$0.00</span>
             </div>
         </div>
+
     </form>
 </div>
 
@@ -97,6 +110,7 @@
             const vatInput = document.getElementById('vat-input');
             const discountInput = document.getElementById('discount-input');
             const addItemBtn = document.getElementById('add-item');
+            const storeSelect = document.getElementById('store_id');
 
             function updateRowSubtotal(row) {
                 const productSelect = row.querySelector('select.product');
@@ -171,12 +185,17 @@
             });
 
             // Confirm Sale
-
-            // Confirm Sale
             document.getElementById('confirm-sale').addEventListener('click', async function() {
                 const customerId = document.getElementById('customer').value;
+                const storeId = storeSelect.value;
+
                 if (!customerId) {
                     alert('Please select a customer.');
+                    return;
+                }
+
+                if (!storeId) {
+                    alert('Please select a store.');
                     return;
                 }
 
@@ -199,16 +218,16 @@
                     return;
                 }
 
-                // Pass VAT percentage and discount amount correctly
                 const vatPercentage = parseFloat(vatInput.value) || 0;
                 const discountAmount = parseFloat(discountInput.value) || 0;
 
                 try {
                     const res = await axios.post('{{ route('invoice.store.sale') }}', {
                         customer_id: customerId,
+                        store_id: storeId,
                         products: products,
-                        vat: vatPercentage, // <-- percentage
-                        discount: discountAmount // <-- amount
+                        vat: vatPercentage,
+                        discount: discountAmount
                     });
 
                     if (res.data.invoice_id) {

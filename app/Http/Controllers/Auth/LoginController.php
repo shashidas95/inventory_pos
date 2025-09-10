@@ -25,7 +25,11 @@ class LoginController extends Controller
             $user = User::whereEmail($credentials['email'])->first();
             // Check if the user exists and the password is correct
             if (!$user || !Hash::check($credentials['password'], $user->password)) {
-              
+                // Assign store_id if manager
+                if ($user->role === 'manager') {
+                    $store = $user->stores()->first(); // manager should have only 1 store
+                    $user->store_id = $store->id ?? null; // dynamically add store_id
+                }
                 return response()->json([
                     'status' => false,
                     'errors' => 'Invalid Credentials',

@@ -9,8 +9,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Category extends Model
 {
     use HasFactory;
+
     protected $fillable = ['name'];
 
+    /**
+     * Category has many products
+     */
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);

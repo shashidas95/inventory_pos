@@ -27,11 +27,6 @@
                                     step="0.01" />
                             </div>
                             <div class="col-md-4 p-2">
-                                <label>Quantity</label>
-                                <input id="quantity" placeholder="Enter Quantity" class="form-control"
-                                    type="number" />
-                            </div>
-                            <div class="col-md-4 p-2">
                                 <label>Description</label>
                                 <textarea id="description" placeholder="Enter Product Description" class="form-control"></textarea>
                             </div>
@@ -40,10 +35,25 @@
                                 <input id="image" class="form-control" type="file" />
                             </div>
                         </div>
+
+                        <hr>
+                        <h5>Store Stock</h5>
+                        <div class="row m-0 p-0">
+                            @foreach ($stores as $store)
+                                <div class="col-md-4 p-2">
+                                    <label>{{ $store->name }} Quantity</label>
+                                    <input type="number" class="form-control store-qty"
+                                        data-store-id="{{ $store->id }}" placeholder="Enter stock quantity"
+                                        min="0" />
+                                </div>
+                            @endforeach
+                        </div>
+
                         <div class="row m-0 p-0">
                             <div class="col-md-4 p-2">
-                                <button onclick="onProductCreate()"
-                                    class="btn mt-3 w-100 bg-gradient-primary">Create</button>
+                                <button onclick="onProductCreate()" class="btn mt-3 w-100 bg-gradient-primary">
+                                    Create
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -56,28 +66,46 @@
 @push('script')
     <script>
         async function onProductCreate() {
-            let name = document.getElementById('name').value;
+            let name = document.getElementById('name').value.trim();
             let category_id = document.getElementById('category_id').value;
             let price = document.getElementById('price').value;
-            let quantity = document.getElementById('quantity').value;
-            let description = document.getElementById('description').value;
+            let description = document.getElementById('description').value.trim();
             let image = document.getElementById('image').files[0];
 
             // Validation
             if (!name) return errorToast('Product name is required');
             if (!category_id) return errorToast('Category is required');
             if (!price) return errorToast('Price is required');
-            if (!quantity) return errorToast('Quantity is required');
             if (!description) return errorToast('Description is required');
             if (!image) return errorToast('Image is required');
 
+            // Collect store quantities
+            let stores = [];
+            document.querySelectorAll('.store-qty').forEach(input => {
+                let qty = parseInt(input.value) || 0;
+                if (qty > 0) {
+                    stores.push({
+                        store_id: input.dataset.storeId,
+                        quantity: qty
+                    });
+                }
+            });
+
+            if (stores.length === 0) return errorToast('At least one store quantity must be entered');
+
+            // ✅ Now define formData BEFORE using it
             let formData = new FormData();
             formData.append('name', name);
             formData.append('category_id', category_id);
             formData.append('price', price);
-            formData.append('quantity', quantity);
             formData.append('description', description);
             formData.append('image', image);
+
+            // Append stores as an array
+            stores.forEach((store, index) => {
+                formData.append(`stores[${index}][store_id]`, store.store_id);
+                formData.append(`stores[${index}][quantity]`, store.quantity);
+            });
 
             showLoader();
             try {
@@ -86,18 +114,14 @@
                         'Content-Type': 'multipart/form-data'
                     }
                 });
-
                 hideLoader();
 
                 if (res.status === 201 && res.data.status === true) {
                     successToast(res.data.message);
-                    setTimeout(() => {
-                        window.location.href = '/product-list';
-                    }, 2000);
+                    setTimeout(() => window.location.href = '/product-list', 2000);
                 } else {
                     errorToast(res.data.message || 'Something went wrong');
                 }
-
             } catch (err) {
                 hideLoader();
                 if (err.response && err.response.status === 422) {
@@ -108,8 +132,8 @@
                         }
                     }
                 } else {
-                    errorToast("Unexpected error occurred.");
                     console.error(err);
+                    errorToast("Unexpected error occurred.");
                 }
             }
         }
