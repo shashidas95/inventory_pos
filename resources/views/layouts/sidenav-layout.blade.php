@@ -40,7 +40,7 @@
 
             <div class="float-right h-auto d-flex">
                 <div class="user-dropdown">
-                    <img id="userAvatar" class="icon-nav-img" src="{{ asset('assets/images/user.webp') }}"
+                    <img id="userAvatar" class="icon-nav-img" src="{{ asset('storage/avatars/UkmnBM4eUc5bVrgxjLRG2QpDFSH37jJWlofZVBmj.jpg') }}"
                         alt="" />
                     <div class="user-dropdown-content ">
                         <div class="mt-4 text-center">

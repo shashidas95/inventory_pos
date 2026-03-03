@@ -29,7 +29,7 @@ class RegisterRequest extends FormRequest
             'password' => 'required|string|min:8|confirmed',
             'phone' => 'required',
             'address' => 'required',
-            'image' => 'required|image|mimes:jpeg, png, jpg| max:2048',
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048',
 
         ];
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Store extends Model
 {
@@ -16,12 +17,22 @@ class Store extends Model
             ->withTimestamps();
     }
     // 🔹 Relationship with products via pivot table
-    public function products()
+
+
+    // Stores can have many products
+    public function products(): BelongsToMany
     {
-        return $this->belongsToMany(Product::class, 'store_product')
-            ->withPivot('quantity')
-            ->withTimestamps();
+        return $this->belongsToMany(Product::class);
     }
+
+    // Stores can have many users (employees/managers)
+
+    // public function products()
+    // {
+    //     return $this->belongsToMany(Product::class, 'store_product')
+    //         ->withPivot('quantity')
+    //         ->withTimestamps();
+    // }
 
     // Shortcut: get all managers
     public function managers()

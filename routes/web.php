@@ -158,7 +158,7 @@ Route::get('/reset-password', [PageController::class, 'resetPassword'])->name('r
 Route::get('/send-otp', [PageController::class, 'sendOtp'])->name('forgot-password.send-otp');
 Route::get('/verify-otp', [PageController::class, 'verifyOtp'])->name('forgot-password.verify-otp');
 
-// Authenticated routes (customer & admin)
+// -------------------- SHARED/AUTHED API STATS (Manager/Customer/Admin) --------------------
 Route::middleware(JwtTokenVerify::class)->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
@@ -182,3 +182,31 @@ Route::middleware(JwtTokenVerify::class)->group(function () {
 });
 Route::get('/list-customer', [CustomerController::class, 'list'])->name('customer.list');
 Route::get('/list-product', [ProductController::class, 'index'])->name('product.list');
+
+
+
+
+// MANAGER-SPECIFIC ROUTES (ROLE: MANAGER ONLY)
+// These routes call methods that apply store_id filtering.
+// --------------------------------------------------------------------------
+Route::prefix('manager')->middleware([JwtTokenVerify::class, 'role:manager'])->group(function () {
+
+    // Dashboard (if needed, but usually redirect to index)
+    // Route::get('/dashboard', [DashboardController::class, 'index'])->name('manager.dashboard');
+
+    // PRODUCTS
+    Route::get('/products', [ProductController::class, 'storeScopedIndex'])->name('manager.products.list');
+    Route::get('/products/assign', [ProductController::class, 'assignIndex'])->name('manager.products.assignIndex');
+    Route::post('/products/assign', [ProductController::class, 'assignProducts'])->name('manager.products.assign');
+
+    // CATEGORIES
+    Route::get('/categories', [CategoryController::class, 'storeScopedIndex'])->name('manager.categories.list');
+
+    // INVOICES
+    Route::get('/invoices', [InvoiceController::class, 'storeScopedIndex'])->name('manager.invoices.list');
+
+    // ORDERS
+    Route::get('/orders', [OrderController::class, 'storeScopedIndex'])->name('manager.orders.list');
+
+    // ... add any other necessary store-scoped routes here ...
+});

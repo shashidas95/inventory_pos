@@ -230,4 +230,28 @@ class OrderController extends Controller
             'order' => $order
         ]);
     }
+    /**
+     * Displays the list of Orders scoped to the current Manager's store.
+     */
+    public function storeScopedIndex()
+    {
+        $user = auth()->user();
+
+        // 1. Role Check
+        if ($user->role !== 'manager') {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $storeId = $user->store_id;
+
+        if (!$storeId) {
+            // Handle manager not assigned to any store
+            return view('manager.orders.list')->with('orders', collect([]));
+        }
+
+        // Filter orders directly by the store_id column.
+        $orders = Order::where('store_id', $storeId)->latest()->paginate(20);
+
+        return view('manager.orders.list', compact('orders'));
+    }
 }

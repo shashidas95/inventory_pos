@@ -172,4 +172,29 @@ class ProductController extends Controller
             'message' => $products->isEmpty() ? 'No products found' : 'Products fetched successfully'
         ]);
     }
+    public function storeIndex()
+    {
+        $user = auth()->user();
+
+        // 1. Role Check: Ensure the authenticated user is actually a manager.
+        if ($user->role !== 'manager') {
+            // Log unauthorized access or redirect to an error page
+            // Since middleware should block this, this is a safety net.
+            abort(403, 'Unauthorized access.');
+        }
+
+        $storeId = $user->store_id;
+
+        if (!$storeId) {
+            // Handle manager not assigned to any store
+            return view('manager.products.list')->with('products', collect([]));
+        }
+
+        // Fetch products associated with the manager's store via the pivot table
+        $products = Product::whereHas('stores', function ($query) use ($storeId) {
+            $query->where('store_id', $storeId);
+        })->paginate(20);
+
+        return view('manager.products.list', compact('products'));
+    }
 }

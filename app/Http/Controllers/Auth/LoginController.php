@@ -40,7 +40,7 @@ class LoginController extends Controller
                 'email' => $user->email,
                 'id' => $user->id,
                 'role' => $user->role,
-                'image' => $user->profile->avatar_url
+                'image' => $user->profile?->avatar_url
             ];
             $exp = 60 * 24;
             $token = JwtToken::createToken($userData, time() + $exp);

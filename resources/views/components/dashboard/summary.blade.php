@@ -3,7 +3,8 @@
 
         {{-- Dashboard Cards --}}
         @php
-            if ($user->role === 'admin') {
+            if ($user->role === 'admin' || $user->role === 'manager') {
+                // Admin and Manager cards use the same structure
                 $cards = [
                     [
                         'id' => 'product',
@@ -56,6 +57,7 @@
                     ],
                 ];
             } else {
+                // Customer cards
                 $cards = [
                     [
                         'id' => 'my-invoices',
@@ -112,9 +114,10 @@
     <div class="container">
         <h2>Welcome, {{ $user->name }} ({{ ucfirst($user->role) }})</h2>
 
-        @if ($user->role === 'admin')
+        @if ($user->role === 'admin' || $user->role === 'manager')
             <h3>Recent Orders</h3>
             <ul>
+                {{-- Use $recentOrders for admin/manager --}}
                 @foreach ($recentOrders as $order)
                     <li>Order #{{ $order->id }} - {{ $order->created_at->format('d M Y') }}</li>
                 @endforeach
@@ -122,6 +125,7 @@
 
             <h3>Recent Invoices</h3>
             <ul>
+                {{-- Use $recentInvoices for admin/manager --}}
                 @foreach ($recentInvoices as $invoice)
                     <li>Invoice #{{ $invoice->id }} - Amount: {{ $invoice->final_total ?? $invoice->total_amount }}
                     </li>
@@ -130,14 +134,16 @@
         @else
             <h3>Your Recent Orders</h3>
             <ul>
-                @foreach ($orders as $order)
+                {{-- FIX: Changed $orders to $recentOrders --}}
+                @foreach ($recentOrders as $order)
                     <li>Order #{{ $order->id }} - {{ $order->created_at->format('d M Y') }}</li>
                 @endforeach
             </ul>
 
             <h3>Your Recent Invoices</h3>
             <ul>
-                @foreach ($invoices as $invoice)
+                {{-- FIX: Changed $invoices to $recentInvoices --}}
+                @foreach ($recentInvoices as $invoice)
                     <li>Invoice #{{ $invoice->id }} - Amount: {{ $invoice->final_total ?? $invoice->total_amount }}
                     </li>
                 @endforeach
@@ -152,23 +158,9 @@
         document.addEventListener("DOMContentLoaded", function() {
             const role = "{{ $user->role }}";
 
-            if (role === 'admin') {
-                // Fetch overall stats (products, categories, orders, invoices)
-                axios.get('{{ route('api.orders.stats') }}')
-                    .then(res => {
-                        const data = res.data;
-                        document.getElementById('orders').textContent = data.total_orders ?? 0;
-                        document.getElementById('product').textContent = data.total_products ?? 0;
-                        document.getElementById('category').textContent = data.total_categories ?? 0;
-                        if (document.getElementById('customer'))
-                            document.getElementById('customer').textContent = data.total_customers ?? 0;
-                    });
-
-                axios.get('{{ route('api.invoices.stats') }}')
-                    .then(res => {
-                        const data = res.data;
-                        document.getElementById('invoice').textContent = data.total_invoices ?? 0;
-                    });
+            if (role === 'admin' || role === 'manager') {
+                // FIX: Removed the axios calls for static counts (products, categories, orders, invoices)
+                // We rely on PHP server-side rendering for these store-scoped initial values.
 
                 // Fetch sales-specific stats (Today, Month, Total) live
                 axios.get('{{ route('api.sales.stats') }}')
@@ -182,11 +174,8 @@
 
             } else {
                 // Customer view
-                axios.get('{{ route('api.invoices.stats') }}')
-                    .then(res => document.getElementById('my-invoices').textContent = res.data.total_invoices ?? 0);
-
-                axios.get('{{ route('api.orders.stats') }}')
-                    .then(res => document.getElementById('my-orders').textContent = res.data.total_orders ?? 0);
+                // FIX: Removed the axios calls for static customer counts for the same reason.
+                // We rely on PHP server-side rendering for these initial values.
             }
         });
     </script>

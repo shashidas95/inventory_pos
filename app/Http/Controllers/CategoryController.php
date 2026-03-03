@@ -52,4 +52,31 @@ class CategoryController extends Controller
         $category->delete();
         return redirect()->route('categories.index')->with('success', 'Category deleted successfully.');
     }
+    /**
+     * Displays the list of Categories scoped to the current Manager's store products.
+     */
+    public function storeScopedIndex()
+    {
+        $user = auth()->user();
+
+        // 1. Role Check
+        if ($user->role !== 'manager') {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $storeId = $user->store_id;
+
+        if (!$storeId) {
+            // Handle manager not assigned to any store
+            return view('manager.categories.list')->with('categories', collect([]));
+        }
+
+        // Fetch categories that have products assigned to the manager's store
+        // Requires a relation path: Category -> products -> stores
+        $categories = Category::whereHas('products.stores', function ($query) use ($storeId) {
+            $query->where('store_id', $storeId);
+        })->paginate(20);
+
+        return view('manager.categories.list', compact('categories'));
+    }
 }

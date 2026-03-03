@@ -287,4 +287,24 @@ class InvoiceController extends Controller
             'invoice' => $invoice
         ]);
     }
+    public function storeScopedIndex()
+    {
+        $user = auth()->user();
+
+        // 1. Role Check: Ensure the authenticated user is actually a manager.
+        if ($user->role !== 'manager') {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $storeId = $user->store_id;
+
+        if (!$storeId) {
+            return view('manager.invoices.list')->with('invoices', collect([]));
+        }
+
+        // Invoice filtering is simple because 'store_id' should be a direct field on the Invoice model.
+        $invoices = Invoice::where('store_id', $storeId)->latest()->paginate(20);
+
+        return view('manager.invoices.list', compact('invoices'));
+    }
 }

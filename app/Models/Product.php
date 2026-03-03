@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Product extends Model
 {
@@ -16,13 +17,18 @@ class Product extends Model
      * Many-to-Many relationship with stores
      * Allows tracking per-store stock
      */
-    public function stores()
+    // public function stores()
+    // {
+    //     return $this->belongsToMany(Store::class, 'store_product')
+    //         ->withPivot('quantity')
+    //         ->withTimestamps();
+    // }
+    // Define the many-to-many relationship with Store
+    public function stores(): BelongsToMany
     {
-        return $this->belongsToMany(Store::class, 'store_product')
-            ->withPivot('quantity')
-            ->withTimestamps();
+        // Assumes the pivot table is named 'product_store'
+        return $this->belongsToMany(Store::class)->withTimestamps();
     }
-
     /**
      * Order Details this product is part of
      */
